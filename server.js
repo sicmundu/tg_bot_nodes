@@ -3,6 +3,8 @@ const app = express();
 const PORT = 3003;
 const { exec } = require('child_process');
 require('dotenv').config();
+const NodeCache = require( "node-cache" );
+const cache = new NodeCache({ stdTTL: 60, checkperiod: 120 });
 
 const TOKEN = process.env.TOKEN;
 
@@ -11,9 +13,7 @@ app.use((req, res, next) => {
     const authorizationHeader = req.headers['authorization'];
     const receivedToken = authorizationHeader && authorizationHeader.replace('Bearer ', '');
 
-    console.log('Received request with headers:', req.headers);
-    console.log('Expected token:', TOKEN);
-    console.log('Received token:', receivedToken);
+
 
     // Проверяем токен
     if (!receivedToken) {
@@ -34,8 +34,17 @@ app.use((req, res, next) => {
 
 
 
-function checkNodeStatus(nodeName, callback) {
-    const command = `docker ps -q --filter "status=running" --filter "name=${nodeName}"`;
+function checkNodeStatus(nodeName, checkType, callback) {
+    let command;
+    if (checkType === 'docker') {
+        command = `docker ps -q --filter "status=running" --filter "name=${nodeName}"`;
+    } else if (checkType === 'systemctl') {
+        command = `systemctl is-active ${nodeName}`;
+    } else {
+        console.error(`Invalid check type: ${checkType}`);
+        callback(false);
+        return;
+    }
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
@@ -44,8 +53,16 @@ function checkNodeStatus(nodeName, callback) {
             return;
         }
 
-        // Если stdout содержит хоть что-то, это означает, что контейнер запущен
-        callback(stdout.trim() !== '');
+        if (checkType === 'docker') {
+            callback(stdout.trim() !== '');
+        } else if (checkType === 'systemctl') {
+            callback(stdout.trim() === 'active');
+        } else {
+            console.error(`Invalid check type: ${checkType}`);
+            callback(false);
+        }
+
+        cache.set(nodeName, isRunning, 60);
     });
 }
 
@@ -76,8 +93,9 @@ app.get('/server_status', (req, res) => {
 
 app.get('/node_status/:nodeName', (req, res) => {
     const nodeName = req.params.nodeName;
-    
-    checkNodeStatus(nodeName, (isRunning) => {
+    const checkType = req.query.check_type;
+
+    checkNodeStatus(nodeName, checkType, (isRunning) => {
         res.send({
             node: nodeName,
             status: isRunning ? 'Running' : 'Not Running'
