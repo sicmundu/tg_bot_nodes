@@ -49,8 +49,8 @@ fi
 # Создание каталога проекта
 box_msg "Создание каталога проекта"
 animate "Создание"
-mkdir -p ~/.tg_bot_manager
-cd ~/.tg_bot_manager
+sudo mkdir -p $HOME/.tg_bot_manager
+cd $HOME/.tg_bot_manager
 echo -e "${GREEN}Каталог создан.${NC}\n"
 
 # Скачивание файла server.js с Github
