@@ -70,7 +70,7 @@ echo -e "${GREEN}Токен сохранен.${NC}\n"
 box_msg "Установка зависимостей"
 animate "Установка"
 npm init -y
-npm install express dotenv
+npm install express dotenv node-cache
 echo -e "${GREEN}Зависимости успешно установлены.${NC}\n"
 
 # Создание и запуск службы
