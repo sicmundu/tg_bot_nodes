@@ -13,7 +13,9 @@ app.use((req, res, next) => {
     const authorizationHeader = req.headers['authorization'];
     const receivedToken = authorizationHeader && authorizationHeader.replace('Bearer ', '');
 
-
+    console.log('Received request with headers:', req.headers);
+    console.log('Expected token:', TOKEN);
+    console.log('Received token:', receivedToken);
 
     // Проверяем токен
     if (!receivedToken) {
@@ -53,18 +55,21 @@ function checkNodeStatus(nodeName, checkType, callback) {
             return;
         }
 
+        let isRunning;
         if (checkType === 'docker') {
-            callback(stdout.trim() !== '');
+            isRunning = (stdout.trim() !== '');
         } else if (checkType === 'systemctl') {
-            callback(stdout.trim() === 'active');
+            isRunning = (stdout.trim() === 'active');
         } else {
             console.error(`Invalid check type: ${checkType}`);
             callback(false);
+            return;
         }
-
         cache.set(nodeName, isRunning, 60);
+        callback(isRunning);
     });
 }
+
 
 app.get('/server_status', (req, res) => {
     // Получение свободного места и общего объема диска
