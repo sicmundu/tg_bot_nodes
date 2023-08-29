@@ -1,118 +1,97 @@
-const express = require('express');
-const app = express();
-const PORT = 3003;
-const { exec } = require('child_process');
-require('dotenv').config();
-const NodeCache = require( "node-cache" );
-const cache = new NodeCache({ stdTTL: 60, checkperiod: 120 });
+#!/bin/bash
 
-const TOKEN = process.env.TOKEN;
+# Цветовая палитра
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
 
-app.use((req, res, next) => {
-    // Получаем токен из заголовков запроса
-    const authorizationHeader = req.headers['authorization'];
-    const receivedToken = authorizationHeader && authorizationHeader.replace('Bearer ', '');
-
-    console.log('Received request with headers:', req.headers);
-    console.log('Expected token:', TOKEN);
-    console.log('Received token:', receivedToken);
-
-    // Проверяем токен
-    if (!receivedToken) {
-        console.error('No token provided.');
-        return res.status(401).send('No token provided.');
-    }
-
-    if (receivedToken !== TOKEN) {
-        console.error('Invalid token provided.');
-        return res.status(401).send('Invalid token.');
-    }
-
-    console.log('Valid token provided. Continuing request processing.');
-
-    // Токен валиден, продолжаем обработку запроса
-    next();
-});
-
-
-
-function checkNodeStatus(nodeName, checkType, callback) {
-    let command;
-    if (checkType === 'docker') {
-        command = `docker ps -q --filter "status=running" --filter "name=${nodeName}"`;
-    } else if (checkType === 'systemctl') {
-        command = `systemctl is-active ${nodeName}`;
-    } else {
-        console.error(`Invalid check type: ${checkType}`);
-        callback(false);
-        return;
-    }
-
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`exec error: ${error}`);
-            callback(false);
-            return;
-        }
-
-        let isRunning;
-        if (checkType === 'docker') {
-            isRunning = (stdout.trim() !== '');
-        } else if (checkType === 'systemctl') {
-            isRunning = (stdout.trim() === 'active');
-        } else {
-            console.error(`Invalid check type: ${checkType}`);
-            callback(false);
-            return;
-        }
-        cache.set(nodeName, isRunning, 60);
-        callback(isRunning);
-    });
+# Функция для вывода сообщения с рамкой
+function box_msg() {
+    local msg="$1"
+    local len=${#msg}
+    printf "\n%0.s*" $(seq 1 $((len+8)))
+    echo -e "\n*  ${YELLOW}$msg${NC}  *"
+    printf "%0.s*" $(seq 1 $((len+8)))
+    echo -e "\n"
 }
 
+# Функция анимации
+function animate() {
+    echo -n "$1 "
+    for i in $(seq 1 3); do
+        echo -n "."
+        sleep 0.5
+    done
+    echo -e "\n"
+}
 
-app.get('/server_status', (req, res) => {
-    // Получение свободного места и общего объема диска
-    exec("df -h | grep ' /$'", (error, stdout, stderr) => {
-        if (error || !stdout) {
-            return res.status(500).send("Error retrieving disk space");
-        }
-        
-        const parts = stdout.trim().split(/\s+/);
-        const total_space = parts[1];  // Общий объем диска
-        const free_space = parts[3];   // Свободное место
+# Проверка и установка Node.js и NPM
+if ! command -v node > /dev/null; then
+    box_msg "Установка Node.js и NPM"
+    animate "Установка"
+    curl -sL https://deb.nodesource.com/setup_16.x | sudo bash -
+    sudo apt-get install -y nodejs
+    echo -e "${GREEN}Node.js и NPM успешно установлены.${NC}\n"
+fi
 
-        // Получение использования RAM и общего объема RAM
-        exec("free -m | grep Mem | awk '{print $3, $2}'", (error, ram_stdout, stderr) => {
-        const [used_ram, total_ram] = ram_stdout.trim().split(' ').map(val => parseFloat(val));
+# Проверка и установка Docker
+if ! command -v docker > /dev/null; then
+    box_msg "Установка Docker"
+    animate "Установка"
+    sudo apt-get update
+    sudo apt-get install -y docker.io
+    sudo systemctl enable docker
+    sudo systemctl start docker
+    echo -e "${GREEN}Docker успешно установлен.${NC}\n"
+fi
 
-             res.send({
-            free_space: free_space,
-            total_space: total_space,
-            used_ram: used_ram, // Возвращаем в MB
-            total_ram: total_ram
-        });
-        });
-    });
-});
+# Создание каталога проекта
+box_msg "Создание каталога проекта"
+animate "Создание"
+sudo mkdir -p $HOME/.tg_bot_manager
+cd $HOME/.tg_bot_manager
+echo -e "${GREEN}Каталог создан.${NC}\n"
 
-app.get('/node_status/:nodeName', (req, res) => {
-    const nodeName = req.params.nodeName;
-    const checkType = req.query.check_type;
+# Скачивание файла server.js с Github
+box_msg "Загрузка server.js"
+animate "Загрузка"
+curl -LJO https://github.com/sicmundu/tg_bot_nodes/raw/main/server.js
+echo -e "${GREEN}server.js успешно загружен.${NC}\n"
 
-    checkNodeStatus(nodeName, checkType, (isRunning) => {
-        res.send({
-            node: nodeName,
-            status: isRunning ? 'Running' : 'Not Running'
-        });
-    });
-});
+# Запрос токена у пользователя и сохранение его в файл .env
+box_msg "Ввод токена"
+echo "Пожалуйста, введите ваш токен:"
+read -r TOKEN
+echo "TOKEN=$TOKEN" > .env
+echo -e "${GREEN}Токен сохранен.${NC}\n"
 
+# Установка зависимостей
+box_msg "Установка зависимостей"
+animate "Установка"
+npm init -y
+npm install express dotenv node-cache
+echo -e "${GREEN}Зависимости успешно установлены.${NC}\n"
 
-app.get('/status', (req, res) => {
-    res.send({status: 'OK'});
-});
+# Создание и запуск службы
+box_msg "Создание и запуск службы"
+animate "Создание"
+cat <<EOL | sudo tee /etc/systemd/system/tg_bot_manager.service > /dev/null
+[Unit]
+Description=TG Bot Manager Service
+After=network.target
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+[Service]
+ExecStart=$(which node) $(realpath server.js)
+WorkingDirectory=$(realpath .)
+User=$(whoami)
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+sudo systemctl daemon-reload
+sudo systemctl enable tg_bot_manager
+sudo systemctl start tg_bot_manager
+echo -e "${GREEN}Сервер успешно установлен и запущен.${NC}\n"
