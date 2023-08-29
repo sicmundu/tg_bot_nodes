@@ -26,36 +26,6 @@ function animate() {
     echo -e "\n"
 }
 
-
-
-#!/bin/bash
-
-# Цветовая палитра
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-NC='\033[0m' # No Color
-
-# Функция для вывода сообщения с рамкой
-function box_msg() {
-    local msg="$1"
-    local len=${#msg}
-    printf "\n%0.s*" $(seq 1 $((len+8)))
-    echo -e "\n*  ${YELLOW}$msg${NC}  *"
-    printf "%0.s*" $(seq 1 $((len+8)))
-    echo -e "\n"
-}
-
-# Функция анимации
-function animate() {
-    echo -n "$1 "
-    for i in $(seq 1 3); do
-        echo -n "."
-        sleep 0.5
-    done
-    echo -e "\n"
-}
-
 # Функция установки
 function install() {
     # Проверка и установка Node.js и NPM
