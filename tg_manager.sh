@@ -6,6 +6,38 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
+SERVER_JS='https://github.com/sicmundu/tg_bot_nodes/raw/main/server.js'
+
+# Функция для вывода сообщения с рамкой
+function box_msg() {
+    local msg="$1"
+    local len=${#msg}
+    printf "\n%0.s*" $(seq 1 $((len+8)))
+    echo -e "\n*  ${YELLOW}$msg${NC}  *"
+    printf "%0.s*" $(seq 1 $((len+8)))
+    echo -e "\n"
+}
+
+# Функция анимации
+function animate() {
+    echo -n "$1 "
+    for i in $(seq 1 3); do
+        echo -n "."
+        sleep 0.5
+    done
+    echo -e "\n"
+}
+
+
+
+#!/bin/bash
+
+# Цветовая палитра
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
 # Функция для вывода сообщения с рамкой
 function box_msg() {
     local msg="$1"
@@ -58,7 +90,7 @@ echo -e "${GREEN}Каталог создан.${NC}\n"
 # Скачивание файла server.js с Github
 box_msg "Загрузка server.js"
 animate "Загрузка"
-curl -LJO https://github.com/sicmundu/tg_bot_nodes/raw/main/server.js
+curl -LJO $SERVER_JS
 echo -e "${GREEN}server.js успешно загружен.${NC}\n"
 
 # Запрос токена у пользователя и сохранение его в файл .env
@@ -134,13 +166,38 @@ function update_token() {
 
 
 
+# Функция обновления
+function update() {
+    # Запрашиваем подтверждение у пользователя
+    read -p "Это действие перезапишет текущий файл server.js. Вы уверены, что хотите продолжить? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]
+    then
+        # Загрузка файла server.js с Github
+        box_msg "Обновление server.js"
+        animate "Загрузка"
+        curl -LJO $SERVER_JS -o $HOME/.tg_bot_manager/server.js
+        echo -e "${GREEN}server.js успешно обновлен.${NC}\n"
+        sleep 1
+        # Перезапуск службы
+        sudo systemctl restart tg_bot_manager
+        echo -e "${GREEN}Служба успешно перезапущена.${NC}\n"
+        sleep 1
+    else
+        echo -e "${RED}Обновление отменено пользователем.${NC}\n"
+    fi
+}
+
 if [ "$1" == "install" ]; then
     install
 elif [ "$1" == "uninstall" ]; then
     uninstall
 elif [ "$1" == "token" ]; then
-    update_token $2
+    update_token
+elif [ "$1" == "update" ]; then
+    update
 else
-    echo -e "${RED}Ошибка: Неверный аргумент. Используйте 'install', 'uninstall' или 'token'.${NC}"
+    echo -e "${RED}Ошибка: Неверный аргумент. Используйте 'install', 'uninstall', 'token' или 'update'.${NC}"
     exit 1
 fi
+
